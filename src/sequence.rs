@@ -14,7 +14,7 @@ pub struct Sequence<'a> {
 
 impl<'a> Display for Sequence<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        assert_eq!(
+        debug_assert_eq!(
             self.key_code.shifted_key_code.is_some(),
             self.modifier.intersects(KeyboardModifiers::SHIFT),
             "KeyCode: {:?}, Modifier: {:?}",
@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[cfg_attr(debug_assertions, should_panic)]
     fn invalid_sequence_display_no_shift() {
         let no_shift_sequence = Sequence {
             key_code: KeyCode {
@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[cfg_attr(debug_assertions, should_panic)]
     fn invalid_sequence_display_no_alternate() {
         let no_alternate_sequence = Sequence {
             key_code: KeyCode {

@@ -247,71 +247,84 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_generation_legacy() {
-        let legacy_mode = ReportingMode::empty();
+    macro_rules! generation_test {
+        ($fn_name:ident, $mode:expr, $shifted:literal, $escape:literal, $backspace:literal, $arrow:literal, $numpad:literal, $ctrl_c:literal) => {
+            #[test]
+            fn $fn_name() {
+                let mode = $mode;
+        
+                let unicode_event = DummyKeyEvent {
+                    key: KeyType::Unicode('A'),
+                    key_without_modifiers: KeyType::Unicode('a'),
+        
+                    modifiers: KeyboardModifiers::SHIFT,
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &unicode_event);
+        
+                assert_eq!(format!("{response}"), $shifted, "Shifted A");
+        
+                let esc_event = DummyKeyEvent {
+                    key: KeyType::Functional(FunctionalKey::Escape),
+                    key_without_modifiers: KeyType::Functional(FunctionalKey::Escape),
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &esc_event);
+        
+                assert_eq!(format!("{response}"), $escape, "Escape");
+        
+                let backspace_event = DummyKeyEvent {
+                    key: KeyType::Functional(FunctionalKey::Backspace),
+                    key_without_modifiers: KeyType::Functional(FunctionalKey::Backspace),
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &backspace_event);
+        
+                assert_eq!(format!("{response}"), $backspace, "Backspace");
+        
+                let arrow_event = DummyKeyEvent {
+                    key: KeyType::Functional(FunctionalKey::Up),
+                    key_without_modifiers: KeyType::Functional(FunctionalKey::Up),
+                    event_type: EventType::Release,
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &arrow_event);
+        
+                assert_eq!(format!("{response}"), $arrow, "Arrow Key Up Released");
+        
+                let numpad_event = DummyKeyEvent {
+                    key: KeyType::Functional(FunctionalKey::NumPad5),
+                    key_without_modifiers: KeyType::Functional(FunctionalKey::NumPad5),
+                    associated_text: Some("5".into()),
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &numpad_event);
+        
+                assert_eq!(format!("{response}"), $numpad, "NumPad Key 5");
+        
+                let ctrl_c_event = DummyKeyEvent {
+                    key: KeyType::Unicode('\x03'),
+                    key_without_modifiers: KeyType::Unicode('c'),
 
-        let unicode_event = DummyKeyEvent {
-            key: KeyType::Unicode('A'),
-            key_without_modifiers: KeyType::Unicode('a'),
-
-            modifiers: KeyboardModifiers::SHIFT,
-            ..Default::default()
+                    modifiers: KeyboardModifiers::CTRL,
+                    ..Default::default()
+                };
+        
+                let response = generate_sequence(mode, &ctrl_c_event);
+        
+                assert_eq!(format!("{response}"), $ctrl_c, "CTRL + C");
+            }
         };
-
-        let response = generate_sequence(legacy_mode, &unicode_event);
-
-        assert_eq!(format!("{response}"), "A");
-
-        let esc_event = DummyKeyEvent {
-            key: KeyType::Functional(FunctionalKey::Escape),
-            key_without_modifiers: KeyType::Functional(FunctionalKey::Escape),
-            ..Default::default()
-        };
-
-        let response = generate_sequence(legacy_mode, &esc_event);
-
-        assert_eq!(format!("{response}"), "\x1b");
-
-        let backspace_event = DummyKeyEvent {
-            key: KeyType::Functional(FunctionalKey::Backspace),
-            key_without_modifiers: KeyType::Functional(FunctionalKey::Backspace),
-            ..Default::default()
-        };
-
-        let response = generate_sequence(legacy_mode, &backspace_event);
-
-        assert_eq!(format!("{response}"), "\x08");
-
-        let arrow_event = DummyKeyEvent {
-            key: KeyType::Functional(FunctionalKey::Up),
-            key_without_modifiers: KeyType::Functional(FunctionalKey::Up),
-            ..Default::default()
-        };
-
-        let response = generate_sequence(legacy_mode, &arrow_event);
-
-        assert_eq!(format!("{response}"), "\x1b[A");
-
-        let numpad_event = DummyKeyEvent {
-            key: KeyType::Functional(FunctionalKey::NumPad5),
-            key_without_modifiers: KeyType::Functional(FunctionalKey::NumPad5),
-            associated_text: Some("5".into()),
-            ..Default::default()
-        };
-
-        let response = generate_sequence(legacy_mode, &numpad_event);
-
-        assert_eq!(format!("{response}"), "5");
-
-        let ctrl_c_event = DummyKeyEvent {
-            key: KeyType::Unicode('\x03'),
-            key_without_modifiers: KeyType::Unicode('c'),
-            ..Default::default()
-        };
-
-        let response = generate_sequence(legacy_mode, &ctrl_c_event);
-
-        assert_eq!(format!("{response}"), "\x03");
     }
+
+    generation_test!(test_generation_legacy, ReportingMode::empty(), "A", "\x1b", "\x08", "\x1b[A", "5", "\x03");
+
+    generation_test!(test_generation_disambiguate, ReportingMode::DISAMBIGUATE_ESC_CODES, "A", "\x1b[27u", "\x08", "\x1b[A", "\x1b[57404u", "\x1b[99;5u");
+
+    generation_test!(test_generation_event_types, ReportingMode::DISAMBIGUATE_ESC_CODES | ReportingMode::REPORT_EVENT_TYPES, "A", "\x1b[27u", "\x08", "\x1b[;1:3A", "\x1b[57404u", "\x1b[99;5u");
 }

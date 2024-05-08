@@ -252,61 +252,61 @@ mod tests {
             #[test]
             fn $fn_name() {
                 let mode = $mode;
-        
+
                 let unicode_event = DummyKeyEvent {
                     key: KeyType::Unicode('A'),
                     key_without_modifiers: KeyType::Unicode('a'),
-        
+
                     modifiers: KeyboardModifiers::SHIFT,
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &unicode_event);
-        
+
                 assert_eq!(format!("{response}"), $shifted, "Shifted A");
-        
+
                 let esc_event = DummyKeyEvent {
                     key: KeyType::Functional(FunctionalKey::Escape),
                     key_without_modifiers: KeyType::Functional(FunctionalKey::Escape),
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &esc_event);
-        
+
                 assert_eq!(format!("{response}"), $escape, "Escape");
-        
+
                 let backspace_event = DummyKeyEvent {
                     key: KeyType::Functional(FunctionalKey::Backspace),
                     key_without_modifiers: KeyType::Functional(FunctionalKey::Backspace),
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &backspace_event);
-        
+
                 assert_eq!(format!("{response}"), $backspace, "Backspace");
-        
+
                 let arrow_event = DummyKeyEvent {
                     key: KeyType::Functional(FunctionalKey::Up),
                     key_without_modifiers: KeyType::Functional(FunctionalKey::Up),
                     event_type: EventType::Release,
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &arrow_event);
-        
+
                 assert_eq!(format!("{response}"), $arrow, "Arrow Key Up Released");
-        
+
                 let numpad_event = DummyKeyEvent {
                     key: KeyType::Functional(FunctionalKey::NumPad5),
                     key_without_modifiers: KeyType::Functional(FunctionalKey::NumPad5),
                     associated_text: Some("5".into()),
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &numpad_event);
-        
+
                 assert_eq!(format!("{response}"), $numpad, "NumPad Key 5");
-        
+
                 let ctrl_c_event = DummyKeyEvent {
                     key: KeyType::Unicode('\x03'),
                     key_without_modifiers: KeyType::Unicode('c'),
@@ -314,17 +314,82 @@ mod tests {
                     modifiers: KeyboardModifiers::CTRL,
                     ..Default::default()
                 };
-        
+
                 let response = generate_sequence(mode, &ctrl_c_event);
-        
+
                 assert_eq!(format!("{response}"), $ctrl_c, "CTRL + C");
             }
         };
     }
 
-    generation_test!(test_generation_legacy, ReportingMode::empty(), "A", "\x1b", "\x08", "\x1b[A", "5", "\x03");
+    generation_test!(
+        test_generation_legacy,
+        ReportingMode::empty(),
+        "A",
+        "\x1b",
+        "\x08",
+        "\x1b[A",
+        "5",
+        "\x03"
+    );
 
-    generation_test!(test_generation_disambiguate, ReportingMode::DISAMBIGUATE_ESC_CODES, "A", "\x1b[27u", "\x08", "\x1b[A", "\x1b[57404u", "\x1b[99;5u");
+    generation_test!(
+        test_generation_disambiguate,
+        ReportingMode::DISAMBIGUATE_ESC_CODES,
+        "A",
+        "\x1b[27u",
+        "\x08",
+        "\x1b[A",
+        "\x1b[57404u",
+        "\x1b[99;5u"
+    );
 
-    generation_test!(test_generation_event_types, ReportingMode::DISAMBIGUATE_ESC_CODES | ReportingMode::REPORT_EVENT_TYPES, "A", "\x1b[27u", "\x08", "\x1b[;1:3A", "\x1b[57404u", "\x1b[99;5u");
+    generation_test!(
+        test_generation_event_types,
+        ReportingMode::DISAMBIGUATE_ESC_CODES | ReportingMode::REPORT_EVENT_TYPES,
+        "A",
+        "\x1b[27u",
+        "\x08",
+        "\x1b[;1:3A",
+        "\x1b[57404u",
+        "\x1b[99;5u"
+    );
+
+    generation_test!(
+        test_generation_alternate_keys,
+        ReportingMode::DISAMBIGUATE_ESC_CODES
+            | ReportingMode::REPORT_EVENT_TYPES
+            | ReportingMode::REPORT_ALTERNATE_KEYS,
+        "A",
+        "\x1b[27u",
+        "\x08",
+        "\x1b[;1:3A",
+        "\x1b[57404u",
+        "\x1b[99:3;5u"
+    );
+
+    generation_test!(
+        test_generation_all_keys_as_esc,
+        ReportingMode::DISAMBIGUATE_ESC_CODES
+            | ReportingMode::REPORT_EVENT_TYPES
+            | ReportingMode::REPORT_ALTERNATE_KEYS
+            | ReportingMode::REPORT_ALL_KEYS_AS_ESC,
+        "\x1b[97:65;2u",
+        "\x1b[27u",
+        "\x1b[127u",
+        "\x1b[;1:3A",
+        "\x1b[57404u",
+        "\x1b[99:3;5u"
+    );
+
+    generation_test!(
+        test_generation_all_modes,
+        ReportingMode::all(),
+        "\x1b[97:65;2u",
+        "\x1b[27u",
+        "\x1b[127u",
+        "\x1b[;1:3A",
+        "\x1b[57404;;53u",
+        "\x1b[99:3;5u"
+    );
 }

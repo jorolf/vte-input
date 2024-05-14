@@ -126,7 +126,7 @@ pub fn generate_sequence(mode: ReportingMode, key_event: &impl KeyEvent) -> Even
         } else {
             EventResponse::Nothing
         }
-    } else {
+    } else { // Legacy mode
         match shifted_key {
             KeyType::Unicode(character) => EventResponse::Character {
                 character,
@@ -142,7 +142,13 @@ pub fn generate_sequence(mode: ReportingMode, key_event: &impl KeyEvent) -> Even
                         alt_pressed: modifiers.intersects(KeyboardModifiers::ALT),
                     }
                 } else {
-                    EventResponse::Sequence(func.to_sequence())
+                    let seq = func.to_sequence();
+                    match seq.terminator {
+                        // Only send legacy sequences, not kitty's
+                        sequence::SequenceTerminator::Kitty => EventResponse::Nothing,
+                        sequence::SequenceTerminator::Other(_) => EventResponse::Sequence(seq),
+                    }
+                    
                 }
             }
             KeyType::Unknown => EventResponse::Nothing,
@@ -261,7 +267,7 @@ mod tests {
     }
 
     macro_rules! generation_test {
-        ($fn_name:ident, $mode:expr, $shifted:literal, $escape:literal, $backspace:literal, $arrow:literal, $numpad:literal, $ctrl_c:literal, $release:literal) => {
+        ($fn_name:ident, $mode:expr, $shifted:literal, $escape:literal, $backspace:literal, $arrow:literal, $numpad:literal, $ctrl_c:literal, $release:literal, $long_keycode:literal) => {
             #[test]
             fn $fn_name() {
                 let mode = $mode;
@@ -343,6 +349,16 @@ mod tests {
                 let response = generate_sequence(mode, &release_event);
 
                 assert_eq!(format!("{response}"), $release, "Key b released");
+
+                let long_keycode_event = DummyKeyEvent {
+                    key_with_modifiers: KeyType::Functional(FunctionalKey::LeftControl),
+                    key_without_modifiers: KeyType::Functional(FunctionalKey::LeftControl),
+                    ..Default::default()
+                };
+
+                let response = generate_sequence(mode, &long_keycode_event);
+
+                assert_eq!(format!("{response}"), $long_keycode, "Left control");
             }
         };
     }
@@ -356,6 +372,7 @@ mod tests {
         "\x1b[A",
         "5",
         "\x03",
+        "",
         ""
     );
 
@@ -368,7 +385,8 @@ mod tests {
         "\x1b[A",
         "\x1b[57404u",
         "\x1b[99;5u",
-        ""
+        "",
+        "\x1b[57442u"
     );
 
     generation_test!(
@@ -380,7 +398,8 @@ mod tests {
         "\x1b[;1:2A",
         "\x1b[57404u",
         "\x1b[99;5u",
-        ""
+        "",
+        "\x1b[57442u"
     );
 
     generation_test!(
@@ -394,7 +413,8 @@ mod tests {
         "\x1b[;1:2A",
         "\x1b[57404u",
         "\x1b[99;5u",
-        ""
+        "",
+        "\x1b[57442u"
     );
 
     generation_test!(
@@ -409,7 +429,8 @@ mod tests {
         "\x1b[;1:2A",
         "\x1b[57404u",
         "\x1b[99;5u",
-        "\x1b[98;1:3u"
+        "\x1b[98;1:3u",
+        "\x1b[57442u"
     );
 
     generation_test!(
@@ -421,6 +442,7 @@ mod tests {
         "\x1b[;1:2A",
         "\x1b[57404;;53u",
         "\x1b[99;5u",
-        "\x1b[98;1:3u"
+        "\x1b[98;1:3u",
+        "\x1b[57442u"
     );
 }
